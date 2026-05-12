@@ -1,0 +1,136 @@
+# =========================
+# PYTHON
+# =========================
+
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+
+# Ambientes virtuais
+venv/
+env/
+.venv/
+ENV/
+
+# Instalações locais
+pip-wheel-metadata/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# =========================
+# IDE / EDITORES
+# =========================
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# CONFIGURAÇÕES LOCAIS
+# =========================
+
+.env
+.env.local
+.env.*.local
+
+# Manter apenas exemplo de configuração
+!.env.example
+
+# =========================
+# LOGS
+# =========================
+
+*.log
+logs/
+data/logs/
+app/logs/
+
+# =========================
+# BANCO DE DADOS LOCAL
+# =========================
+
+*.db
+*.sqlite
+*.sqlite3
+database.db
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# =========================
+# IMAGENS E DADOS SENSÍVEIS
+# =========================
+
+# Fotos reais de pessoas cadastradas
+data/known_faces/*
+data/unknown_faces/*
+data/captures/*
+
+# Permitir manter a estrutura das pastas
+!data/known_faces/.gitkeep
+!data/unknown_faces/.gitkeep
+!data/captures/.gitkeep
+
+# =========================
+# EVIDÊNCIAS PESADAS
+# =========================
+
+evidencias/videos/*
+evidencias/prints/*
+evidencias/testes/*
+
+# Permitir manter a estrutura das pastas
+!evidencias/videos/.gitkeep
+!evidencias/prints/.gitkeep
+!evidencias/testes/.gitkeep
+
+# =========================
+# ARQUIVOS DE MÍDIA
+# =========================
+
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.webp
+
+# Exceção para imagens da documentação, se vocês criarem
+!docs/**/*.png
+!docs/**/*.jpg
+!docs/**/*.jpeg
+
+# =========================
+# SISTEMA OPERACIONAL
+# =========================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# JUPYTER / NOTEBOOKS
+# =========================
+
+.ipynb_checkpoints/
+
+# =========================
+# DEEPFACE / MODELOS / CACHE
+# =========================
+
+.deepface/
+weights/
+models/
+.cache/
