@@ -3,3 +3,4 @@ deepface
 numpy
 pandas
 python-dotenv
+tf-keras

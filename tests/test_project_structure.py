@@ -9,6 +9,7 @@ def test_required_project_structure_exists():
         "app",
         "app/__init__.py",
         "app/camera.py",
+        "app/face_detector.py",
         "app/face_recognition_service.py",
         "app/risk_analyzer.py",
         "app/alert_service.py",
@@ -18,6 +19,7 @@ def test_required_project_structure_exists():
         "data/logs",
         "tests",
         "scripts/test_webcam_manual.py",
+        "scripts/test_recognition_manual.py",
     ]
 
     missing_paths = [

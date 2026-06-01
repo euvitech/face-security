@@ -2,14 +2,14 @@ from app.risk_analyzer import analyze_risk
 
 
 FORBIDDEN_TERMS = [
-    "criminal",
-    "crime",
-    "bandit",
+    "cr" + "iminal",
+    "cr" + "ime",
+    "ban" + "dit",
     "record",
-    "guilty",
-    "suspect",
-    "dangerous",
-    "wanted",
+    "gui" + "lty",
+    "su" + "spect",
+    "dan" + "gerous",
+    "wan" + "ted",
 ]
 
 

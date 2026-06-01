@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
@@ -15,9 +16,11 @@ except ImportError:
 
 
 class EventLogger:
-    def __init__(self, logs_dir="data/logs", evidence_dir="data/unknown_faces"):
-        self.logs_dir = Path(logs_dir)
-        self.evidence_dir = Path(evidence_dir)
+    def __init__(self, logs_dir=None, evidence_dir=None):
+        self.logs_dir = Path(logs_dir or os.getenv("LOGS_DIR", "data/logs"))
+        self.evidence_dir = Path(
+            evidence_dir or os.getenv("UNKNOWN_FACES_DIR", "data/unknown_faces")
+        )
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         self.evidence_dir.mkdir(parents=True, exist_ok=True)
         self.log_file = self.logs_dir / "events.jsonl"

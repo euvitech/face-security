@@ -4,7 +4,7 @@
 
 O **Face Security** é um projeto acadêmico com foco em reconhecimento facial para apoio à segurança residencial. O objetivo do MVP é demonstrar, de forma simples e funcional, um sistema capaz de abrir a câmera do computador, identificar se uma pessoa está cadastrada na base local e classificar a ocorrência como situação normal ou de atenção.
 
-O sistema não tem o objetivo de identificar criminosos, prever crimes ou tomar decisões automáticas contra pessoas. A proposta correta para apresentação é:
+O sistema não tem o objetivo de rotular pessoas, prever incidentes ou tomar decisões automáticas contra pessoas. A proposta correta para apresentação é:
 
 > O Face Security identifica pessoas cadastradas e não cadastradas em uma área monitorada, auxiliando na prevenção de incidentes por meio de alertas visuais e registros de evidência.
 
@@ -44,7 +44,7 @@ O MVP deve conseguir:
 - Aplicativo mobile.
 - Envio real de alerta por WhatsApp, SMS ou e-mail.
 - Banco de dados complexo.
-- Reconhecimento de antecedentes criminais.
+- Consulta de antecedentes externos.
 - Integração com câmeras externas.
 - Deploy em nuvem.
 - Sistema definitivo de vigilância.
@@ -299,7 +299,7 @@ O sistema deve permitir gravação de vídeo demonstrando o funcionamento.
 
 ### RNF04 — Segurança conceitual
 
-O sistema não deve afirmar que uma pessoa é criminosa. Ele apenas classifica pessoas como cadastradas ou não cadastradas.
+O sistema não deve rotular uma pessoa. Ele apenas classifica pessoas como cadastradas ou não cadastradas.
 
 ### RNF05 — Uso local
 
