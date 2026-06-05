@@ -137,3 +137,56 @@ def test_event_logger_uses_log_and_unknown_dirs_from_environment(
 
     assert logger.logs_dir == logs_dir
     assert logger.evidence_dir == unknown_faces_dir
+
+
+class FakeClock:
+    def __init__(self, value=0):
+        self.value = value
+
+    def __call__(self):
+        return self.value
+
+
+def test_event_logger_saves_unknown_evidence_only_after_cooldown(tmp_path, mocker):
+    frame = np.zeros((10, 10, 3), dtype=np.uint8)
+    clock = FakeClock(0)
+    logger = EventLogger(
+        logs_dir=tmp_path / "logs",
+        evidence_dir=tmp_path / "unknown_faces",
+        unknown_evidence_cooldown_seconds=5,
+        clock=clock,
+    )
+
+    def fake_imwrite(path, image):
+        Path(path).write_bytes(b"image")
+        return True
+
+    imwrite = mocker.patch("app.logger.cv2.imwrite", side_effect=fake_imwrite)
+
+    first_path = logger.save_unknown_evidence(frame=frame, name="unknown")
+    second_path = logger.save_unknown_evidence(frame=frame, name="unknown")
+    clock.value = 5.1
+    third_path = logger.save_unknown_evidence(frame=frame, name="unknown")
+
+    assert first_path is not None
+    assert second_path is None
+    assert third_path is not None
+    assert imwrite.call_count == 2
+
+
+def test_event_logger_does_not_save_duplicate_unknown_images_every_frame(tmp_path, mocker):
+    frame = np.zeros((10, 10, 3), dtype=np.uint8)
+    clock = FakeClock(10)
+    logger = EventLogger(
+        logs_dir=tmp_path / "logs",
+        evidence_dir=tmp_path / "unknown_faces",
+        unknown_evidence_cooldown_seconds=5,
+        clock=clock,
+    )
+    imwrite = mocker.patch("app.logger.cv2.imwrite", return_value=True)
+
+    paths = [logger.save_unknown_evidence(frame=frame, name="unknown") for _ in range(4)]
+
+    assert paths[0] is not None
+    assert paths[1:] == [None, None, None]
+    imwrite.assert_called_once()

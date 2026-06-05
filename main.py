@@ -22,8 +22,7 @@ except ImportError:
 from app.alert_service import apply_alert_overlay, build_alert_text, draw_face_overlays
 from app.camera import Camera, CameraError
 from app.face_detector import FaceDetector
-from app.face_recognition_service import FaceRecognitionService
-from app.logger import EventLogger
+from app.recognition_process import RecognitionProcess
 from app.risk_analyzer import analyze_risk
 
 
@@ -75,28 +74,18 @@ class RealTimeRecognitionFlow:
     def __init__(
         self,
         face_detector,
-        recognition_service,
-        event_logger,
-        recognition_interval_frames=30,
-        recognition_interval_seconds=1.5,
-        unknown_evidence_cooldown_seconds=5,
-        save_unknown_evidence=True,
+        recognition_process,
+        recognition_interval_seconds=3.0,
+        max_recognition_image_width=320,
         clock=None,
     ):
         self.face_detector = face_detector
-        self.recognition_service = recognition_service
-        self.event_logger = event_logger
-        self.recognition_interval_frames = max(1, int(recognition_interval_frames))
+        self.recognition_process = recognition_process
         self.recognition_interval_seconds = float(recognition_interval_seconds)
-        self.unknown_evidence_cooldown_seconds = float(
-            unknown_evidence_cooldown_seconds
-        )
-        self.save_unknown_evidence = save_unknown_evidence
+        self.max_recognition_image_width = max(1, int(max_recognition_image_width))
         self.clock = clock or time.monotonic
         self.frame_number = 0
-        self.last_recognition_frame = None
         self.last_recognition_time = None
-        self.last_unknown_evidence_time = None
         self.last_result = _no_face_result()
 
     def process_frame(self, frame, sensitive_area=False):
@@ -113,82 +102,66 @@ class RealTimeRecognitionFlow:
             )
             return {**self.last_result, "frame": frame_with_overlay, "boxes": boxes}
 
-        if self._should_run_recognition(now):
-            recognition = self.recognition_service.recognize(frame)
-            self.last_result = self._result_from_recognition(
-                recognition=recognition,
-                frame=frame,
-                now=now,
+        if self._should_start_recognition(now):
+            face_frame = self._copy_face_frame(frame, boxes[0])
+            started = self.recognition_process.submit(
+                frame=face_frame,
                 sensitive_area=sensitive_area,
             )
-            self.last_recognition_frame = self.frame_number
-            self.last_recognition_time = now
+            if started:
+                self.last_recognition_time = now
+
+        display_result = self.recognition_process.get_display_result()
+        if display_result.get("status") != "PROCESSING":
+            self.last_result = display_result
 
         frame_with_overlay = draw_face_overlays(
             frame=frame,
             boxes=boxes,
-            recognition=self.last_result,
+            recognition=display_result,
         )
-        return {**self.last_result, "frame": frame_with_overlay, "boxes": boxes}
+        return {**display_result, "frame": frame_with_overlay, "boxes": boxes}
 
-    def _should_run_recognition(self, now):
-        if self.last_recognition_frame is None or self.last_recognition_time is None:
-            return True
-
-        frames_since = self.frame_number - self.last_recognition_frame
-        seconds_since = now - self.last_recognition_time
-        return (
-            frames_since >= self.recognition_interval_frames
-            or seconds_since >= self.recognition_interval_seconds
-        )
-
-    def _result_from_recognition(self, recognition, frame, now, sensitive_area=False):
-        if recognition.get("status") == "NO_FACE_DETECTED":
-            return _no_face_result()
-
-        identity = recognition.get("identity") or recognition.get("name", "unknown")
-        risk = analyze_risk(
-            is_recognized=recognition["recognized"],
-            sensitive_area=sensitive_area,
-        )
-        evidence_path = None
-        if risk["status"] == "UNRECOGNIZED" and self._should_save_unknown(now):
-            evidence_path = self.event_logger.save_evidence(
-                frame=frame,
-                status=risk["status"],
-                name=identity,
-            )
-            self.last_unknown_evidence_time = now
-
-        self.event_logger.register_event(
-            name=identity,
-            status=risk["status"],
-            attention_level=risk["attention_level"],
-            evidence_path=evidence_path,
-        )
-        return {
-            "identity": identity,
-            "name": identity,
-            "recognized": recognition["recognized"],
-            "status": risk["status"],
-            "attention_level": risk["attention_level"],
-            "evidence_path": evidence_path,
-            "confidence": recognition.get("confidence"),
-            "distance": recognition.get("distance"),
-            "matched_image": recognition.get("matched_image"),
-        }
-
-    def _should_save_unknown(self, now):
-        if not self.save_unknown_evidence:
+    def _should_start_recognition(self, now):
+        if self.recognition_process.is_processing:
             return False
-        if self.last_unknown_evidence_time is None:
+        if self.last_recognition_time is None:
             return True
 
-        return (
-            now - self.last_unknown_evidence_time
-            >= self.unknown_evidence_cooldown_seconds
-        )
+        return now - self.last_recognition_time >= self.recognition_interval_seconds
 
+    def _copy_face_frame(self, frame, box):
+        try:
+            height, width = frame.shape[:2]
+            x = max(0, int(box["x"]))
+            y = max(0, int(box["y"]))
+            w = max(0, int(box["w"]))
+            h = max(0, int(box["h"]))
+            x2 = min(width, x + w)
+            y2 = min(height, y + h)
+            if x2 <= x or y2 <= y:
+                face_frame = frame.copy()
+            else:
+                face_frame = frame[y:y2, x:x2].copy()
+
+            return self._resize_recognition_frame(face_frame)
+        except Exception:
+            if hasattr(frame, "copy"):
+                return self._resize_recognition_frame(frame.copy())
+
+            return frame
+
+    def _resize_recognition_frame(self, frame):
+        try:
+            height, width = frame.shape[:2]
+        except Exception:
+            return frame
+
+        if width <= self.max_recognition_image_width:
+            return frame
+
+        resized_height = max(1, int(height * (self.max_recognition_image_width / width)))
+        return cv2.resize(frame, (self.max_recognition_image_width, resized_height))
 
 def process_frame(
     frame,
@@ -263,33 +236,36 @@ def process_frame(
 
 def main(max_frames=None):
     show_camera_window = _env_bool("SHOW_CAMERA_WINDOW", True)
+    frame_width = _env_int("FRAME_WIDTH", 640)
+    frame_height = _env_int("FRAME_HEIGHT", 480)
     camera = Camera(index=_env_int("CAMERA_INDEX", 0))
-    recognition_service = FaceRecognitionService(require_face_detection=False)
-    event_logger = EventLogger(
-        logs_dir=os.getenv("LOGS_DIR", "data/logs"),
-        evidence_dir=os.getenv("UNKNOWN_FACES_DIR", "data/unknown_faces"),
+    recognition_process = RecognitionProcess(
+        unknown_evidence_cooldown_seconds=_env_float(
+            "UNKNOWN_EVIDENCE_COOLDOWN_SECONDS",
+            5.0,
+        ),
+        save_unknown_evidence=_env_bool("SAVE_UNKNOWN_EVIDENCE", True),
     )
     flow = RealTimeRecognitionFlow(
         face_detector=FaceDetector(),
-        recognition_service=recognition_service,
-        event_logger=event_logger,
-        recognition_interval_frames=_env_int("RECOGNITION_INTERVAL_FRAMES", 30),
+        recognition_process=recognition_process,
         recognition_interval_seconds=_env_float(
             "RECOGNITION_INTERVAL_SECONDS",
-            1.5,
+            3.0,
         ),
-        unknown_evidence_cooldown_seconds=_env_float(
-            "UNKNOWN_EVIDENCE_COOLDOWN_SECONDS",
-            5,
+        max_recognition_image_width=_env_int(
+            "MAX_RECOGNITION_IMAGE_WIDTH",
+            320,
         ),
-        save_unknown_evidence=_env_bool("SAVE_UNKNOWN_EVIDENCE", True),
     )
     frames_processed = 0
 
     try:
+        recognition_process.start()
         camera.open()
         while True:
             frame = camera.read_frame()
+            frame = cv2.resize(frame, (frame_width, frame_height))
             result = flow.process_frame(frame)
             frames_processed += 1
 
@@ -311,6 +287,7 @@ def main(max_frames=None):
     except KeyboardInterrupt:
         pass
     finally:
+        recognition_process.shutdown()
         camera.release()
         if show_camera_window:
             cv2.destroyAllWindows()

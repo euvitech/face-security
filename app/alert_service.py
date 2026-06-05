@@ -18,6 +18,8 @@ except ImportError:
 def build_alert_text(name, status, attention_level):
     if status == "NO_FACE_DETECTED":
         return f"{status}: waiting for face | Attention: {attention_level}"
+    if status == "PROCESSING":
+        return "PROCESSING"
 
     display_name = name if status == "AUTHORIZED" else "unrecognized person"
     return f"{status}: {display_name} | Attention: {attention_level}"
@@ -42,6 +44,8 @@ def draw_face_overlays(frame, boxes, recognition=None):
     name = recognition.get("name") or recognition.get("identity") or "unknown"
     label = _label_for(status, name)
     color = _color_for(status)
+    previous_label = _previous_label_for_processing(recognition)
+    previous_color = _previous_color_for_processing(recognition)
 
     for box in boxes:
         x = int(box["x"])
@@ -49,6 +53,16 @@ def draw_face_overlays(frame, boxes, recognition=None):
         w = int(box["w"])
         h = int(box["h"])
         cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+        if previous_label:
+            cv2.putText(
+                frame,
+                previous_label,
+                (x, y + h + 20),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                previous_color,
+                2,
+            )
         cv2.putText(
             frame,
             label,
@@ -68,7 +82,27 @@ def draw_face_overlays(frame, boxes, recognition=None):
     return frame
 
 
+def _previous_label_for_processing(recognition):
+    if recognition.get("status") != "PROCESSING":
+        return None
+
+    previous = recognition.get("previous_result") or {}
+    previous_status = previous.get("status")
+    if not previous_status or previous_status == "NO_FACE_DETECTED":
+        return None
+
+    previous_name = previous.get("name") or previous.get("identity") or "unknown"
+    return _label_for(previous_status, previous_name)
+
+
+def _previous_color_for_processing(recognition):
+    previous = recognition.get("previous_result") or {}
+    return _color_for(previous.get("status"))
+
+
 def _label_for(status, name):
+    if status == "PROCESSING":
+        return "PROCESSING"
     if status == "AUTHORIZED":
         return f"AUTHORIZED: {name}"
     if status == "UNRECOGNIZED":
@@ -78,6 +112,8 @@ def _label_for(status, name):
 
 
 def _color_for(status):
+    if status == "PROCESSING":
+        return (255, 180, 0)
     if status == "AUTHORIZED":
         return (0, 255, 0)
     if status == "UNRECOGNIZED":

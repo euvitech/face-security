@@ -14,6 +14,8 @@ FORBIDDEN_TERMS = [
     "dan" + "gerous person",
     "gui" + "lty",
     "wan" + "ted person",
+    "su" + "spect",
+    "ban" + "dit",
 ]
 
 
@@ -79,7 +81,7 @@ def test_draw_face_overlays_draws_rectangle_and_label(mocker):
     assert result is frame
     rectangle.assert_called_once_with(frame, (10, 12), (40, 44), (0, 255, 0), 2)
     put_text.assert_called_once()
-    assert "AUTHORIZED" in put_text.call_args.args[1]
+    assert put_text.call_args.args[1] == "AUTHORIZED: rayston"
 
 
 def test_draw_face_overlays_shows_unrecognized_label(mocker):
@@ -96,12 +98,47 @@ def test_draw_face_overlays_shows_unrecognized_label(mocker):
     assert "UNRECOGNIZED" in put_text.call_args.args[1]
 
 
+def test_draw_face_overlays_shows_processing_label(mocker):
+    frame = np.zeros((100, 100, 3), dtype=np.uint8)
+    mocker.patch("app.alert_service.cv2.rectangle", return_value=frame)
+    put_text = mocker.patch("app.alert_service.cv2.putText", return_value=frame)
+
+    draw_face_overlays(
+        frame=frame,
+        boxes=[{"x": 10, "y": 12, "w": 30, "h": 32}],
+        recognition={"status": "PROCESSING", "name": "unknown"},
+    )
+
+    assert put_text.call_args.args[1] == "PROCESSING"
+
+
+def test_draw_face_overlays_keeps_previous_result_visible_while_processing(mocker):
+    frame = np.zeros((100, 100, 3), dtype=np.uint8)
+    mocker.patch("app.alert_service.cv2.rectangle", return_value=frame)
+    put_text = mocker.patch("app.alert_service.cv2.putText", return_value=frame)
+
+    draw_face_overlays(
+        frame=frame,
+        boxes=[{"x": 10, "y": 12, "w": 30, "h": 32}],
+        recognition={
+            "status": "PROCESSING",
+            "name": "unknown",
+            "previous_result": {"status": "AUTHORIZED", "name": "rayston"},
+        },
+    )
+
+    rendered_labels = [call.args[1] for call in put_text.call_args_list]
+    assert "AUTHORIZED: rayston" in rendered_labels
+    assert "PROCESSING" in rendered_labels
+
+
 def test_alert_text_uses_safe_non_accusatory_language():
     texts = [
         build_alert_text("integrante_01", "AUTHORIZED", "LOW"),
         build_alert_text("unknown", "UNRECOGNIZED", "ATTENTION"),
         build_alert_text("unknown", "UNRECOGNIZED", "ALERT"),
         build_alert_text("no_face_detected", "NO_FACE_DETECTED", "NONE"),
+        "PROCESSING",
     ]
     frame = np.zeros((100, 100, 3), dtype=np.uint8)
     draw_face_overlays(

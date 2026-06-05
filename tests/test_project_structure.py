@@ -11,6 +11,8 @@ def test_required_project_structure_exists():
         "app/camera.py",
         "app/face_detector.py",
         "app/face_recognition_service.py",
+        "app/recognition_worker.py",
+        "app/recognition_process.py",
         "app/risk_analyzer.py",
         "app/alert_service.py",
         "app/logger.py",
